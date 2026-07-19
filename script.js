@@ -96,22 +96,32 @@ function renderAlbums() {
     });
 }
 
-// --- Загрузка обложки альбома (если есть) ---
+// --- Загрузка обложки альбома (любое изображение в папке) ---
 async function loadCover(albumPath, imgElement) {
-    const coverNames = ['cover.jpg', 'cover.png', 'folder.jpg', 'folder.png'];
-    for (const name of coverNames) {
-        try {
-            const filePath = `${albumPath}/${name}`;
-            // Проверяем, существует ли файл (можно через метаданные)
-            const data = await apiRequest(`/resources?path=${encodeURIComponent(filePath)}`);
-            if (data && data.type === 'file') {
-                const link = await getDownloadLink(filePath);
-                imgElement.src = link;
-                break;
-            }
-        } catch (e) {
-            // файл не найден — пробуем следующий
+    try {
+        // Получаем все файлы в папке альбома
+        const items = await getFolderContents(albumPath);
+        // Расширения, которые считаем изображениями
+        const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
+        const imageFiles = items.filter(item => 
+            item.type === 'file' && imageExtensions.some(ext => item.name.toLowerCase().endsWith(ext))
+        );
+        if (imageFiles.length > 0) {
+            // Сортируем: сначала файлы с "cover" или "folder" в имени (для приоритета)
+            imageFiles.sort((a, b) => {
+                const aName = a.name.toLowerCase();
+                const bName = b.name.toLowerCase();
+                const aPriority = (aName.includes('cover') || aName.includes('folder')) ? 0 : 1;
+                const bPriority = (bName.includes('cover') || bName.includes('folder')) ? 0 : 1;
+                return aPriority - bPriority;
+            });
+            // Берём первое подходящее изображение
+            const link = await getDownloadLink(imageFiles[0].path);
+            imgElement.src = link;
         }
+        // Если изображений нет – оставляем placeholder
+    } catch (error) {
+        console.warn('Не удалось загрузить обложку для', albumPath, error);
     }
 }
 
