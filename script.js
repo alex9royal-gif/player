@@ -21,9 +21,11 @@ const trackList = document.getElementById('track-list');
 const audioPlayer = document.getElementById('audio-player');
 const backBtn = document.getElementById('back-btn');
 
+// --- Установка громкости по умолчанию 50% ---
+audioPlayer.volume = 0.5;
+
 // --- Вспомогательные функции API ---
 
-// Универсальный запрос к API Яндекс.Диска
 async function apiRequest(endpoint, method = 'GET', body = null) {
     const url = `${YANDEX_API_BASE}${endpoint}`;
     const headers = {
@@ -48,13 +50,11 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
     return response.json();
 }
 
-// Получение содержимого папки (ресурсы)
 async function getFolderContents(path) {
     const data = await apiRequest(`/resources?path=${encodeURIComponent(path)}&limit=1000`);
     return data._embedded.items;
 }
 
-// Получение ссылки на скачивание файла (использует /resources/download)
 async function getDownloadLink(path) {
     const data = await apiRequest(`/resources/download?path=${encodeURIComponent(path)}`);
     return data.href;
@@ -93,10 +93,9 @@ function renderAlbums() {
     });
 }
 
-// --- Загрузка обложки альбома (через /resources/download) ---
+// --- Загрузка обложки через /resources/download ---
 async function loadCover(albumPath, imgElement) {
     try {
-        // Получаем список файлов в папке альбома
         const items = await getFolderContents(albumPath);
         const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
         const imageFiles = items.filter(item => 
@@ -104,7 +103,6 @@ async function loadCover(albumPath, imgElement) {
         );
         if (imageFiles.length === 0) return;
 
-        // Приоритет файлам с "cover" или "folder" в имени
         imageFiles.sort((a, b) => {
             const aName = a.name.toLowerCase();
             const bName = b.name.toLowerCase();
@@ -114,7 +112,6 @@ async function loadCover(albumPath, imgElement) {
         });
 
         const firstImage = imageFiles[0];
-        // Получаем прямую ссылку на скачивание через /resources/download
         const downloadUrl = await getDownloadLink(firstImage.path);
         imgElement.src = downloadUrl;
     } catch (error) {
@@ -122,7 +119,7 @@ async function loadCover(albumPath, imgElement) {
     }
 }
 
-// --- Открытие альбома (список треков) ---
+// --- Открытие альбома ---
 
 async function openAlbum(album) {
     try {
@@ -164,10 +161,8 @@ async function showPlayer() {
         trackList.appendChild(li);
     }
     
-    if (currentAlbum.tracks.length > 0) {
-        const firstLi = trackList.querySelector('li');
-        await playTrack(firstLi);
-    }
+    // --- Убрано автоматическое воспроизведение первого трека ---
+    // Теперь пользователь сам выбирает трек для прослушивания
 }
 
 async function playTrack(liElement) {
