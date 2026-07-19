@@ -1,6 +1,6 @@
 // --- Конфигурация ---
 const YANDEX_API_BASE = 'https://cloud-api.yandex.net/v1/disk';
-const MUSIC_FOLDER = '/music'; // Папка на Яндекс.Диске, где лежат альбомы
+const MUSIC_FOLDER = '/music';
 
 // --- Состояние приложения ---
 let albums = [];
@@ -54,7 +54,7 @@ async function getFolderContents(path) {
     return data._embedded.items;
 }
 
-// Получение ссылки на скачивание файла
+// Получение ссылки на скачивание файла (использует /resources/download)
 async function getDownloadLink(path) {
     const data = await apiRequest(`/resources/download?path=${encodeURIComponent(path)}`);
     return data.href;
@@ -65,7 +65,6 @@ async function getDownloadLink(path) {
 async function loadAlbums() {
     try {
         const items = await getFolderContents(MUSIC_FOLDER);
-        // Оставляем только папки
         albums = items.filter(item => item.type === 'dir');
         renderAlbums();
     } catch (error) {
@@ -83,7 +82,6 @@ function renderAlbums() {
     albums.forEach(album => {
         const card = document.createElement('div');
         card.className = 'album-card';
-        // Пытаемся найти обложку (cover.jpg, folder.jpg) — позже загрузим отдельно
         card.innerHTML = `
             <img src="placeholder.jpg" alt="${album.name}" data-path="${album.path}">
             <h3>${album.name}</h3>
@@ -91,23 +89,22 @@ function renderAlbums() {
         card.addEventListener('click', () => openAlbum(album));
         albumGrid.appendChild(card);
         
-        // Попробуем загрузить обложку, если есть
         loadCover(album.path, card.querySelector('img'));
     });
 }
 
-// --- Загрузка обложки альбома (используем sizes с name="L") ---
+// --- Загрузка обложки альбома (через /resources/download) ---
 async function loadCover(albumPath, imgElement) {
     try {
-        // Получаем список всех файлов в папке альбома
+        // Получаем список файлов в папке альбома
         const items = await getFolderContents(albumPath);
         const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
         const imageFiles = items.filter(item => 
             item.type === 'file' && imageExtensions.some(ext => item.name.toLowerCase().endsWith(ext))
         );
-        if (imageFiles.length === 0) return; // нет изображений
+        if (imageFiles.length === 0) return;
 
-        // Сортируем: сначала файлы с "cover" или "folder" в имени (приоритет)
+        // Приоритет файлам с "cover" или "folder" в имени
         imageFiles.sort((a, b) => {
             const aName = a.name.toLowerCase();
             const bName = b.name.toLowerCase();
@@ -117,22 +114,9 @@ async function loadCover(albumPath, imgElement) {
         });
 
         const firstImage = imageFiles[0];
-        // Получаем полные метаданные файла (чтобы получить sizes)
-        const resourceData = await apiRequest(`/resources?path=${encodeURIComponent(firstImage.path)}`);
-        
-        let imageUrl = null;
-        if (resourceData.sizes && resourceData.sizes.length > 0) {
-            // Ищем размер "L" (оптимальный для отображения)
-            const sizeL = resourceData.sizes.find(s => s.name === 'L');
-            imageUrl = sizeL ? sizeL.url : resourceData.sizes[0].url;
-        }
-        // Резерв: если sizes нет (редко), используем preview (он тоже работает для показа)
-        if (!imageUrl && resourceData.preview) {
-            imageUrl = resourceData.preview;
-        }
-        if (imageUrl) {
-            imgElement.src = imageUrl;
-        }
+        // Получаем прямую ссылку на скачивание через /resources/download
+        const downloadUrl = await getDownloadLink(firstImage.path);
+        imgElement.src = downloadUrl;
     } catch (error) {
         console.warn('Не удалось загрузить обложку для', albumPath, error);
     }
@@ -146,7 +130,6 @@ async function openAlbum(album) {
         const trackFiles = items.filter(item => 
             item.type === 'file' && /\.(mp3|wav|ogg|flac|m4a)$/i.test(item.name)
         );
-        // Сортируем по имени
         trackFiles.sort((a, b) => a.name.localeCompare(b.name));
         
         currentAlbum = {
@@ -166,25 +149,21 @@ async function showPlayer() {
     player.style.display = 'block';
     
     albumTitle.textContent = currentAlbum.name;
-    albumCover.src = 'placeholder.jpg'; // временно
+    albumCover.src = 'placeholder.jpg';
     
-    // Загружаем обложку альбома (если есть)
     loadCover(currentAlbum.path, albumCover);
     
     trackList.innerHTML = '';
-    // Для каждого трека получаем ссылку на скачивание и сохраняем в атрибуте data-url
     for (const track of currentAlbum.tracks) {
         const li = document.createElement('li');
-        li.textContent = track.name.replace(/\.[^.]+$/, ''); // имя без расширения
+        li.textContent = track.name.replace(/\.[^.]+$/, '');
         li.dataset.trackPath = track.path;
-        // Ссылку получим при клике (или заранее)
         li.addEventListener('click', async () => {
             await playTrack(li);
         });
         trackList.appendChild(li);
     }
     
-    // Автоматически играем первый трек
     if (currentAlbum.tracks.length > 0) {
         const firstLi = trackList.querySelector('li');
         await playTrack(firstLi);
@@ -198,7 +177,6 @@ async function playTrack(liElement) {
         audioPlayer.src = downloadUrl;
         audioPlayer.load();
         audioPlayer.play();
-        // Подсветка
         trackList.querySelectorAll('li').forEach(li => li.classList.remove('active'));
         liElement.classList.add('active');
     } catch (error) {
@@ -226,14 +204,12 @@ authBtn.addEventListener('click', async () => {
     }
     authError.textContent = '';
     try {
-        // Проверим токен, запросив информацию о диске
         const response = await fetch(`${YANDEX_API_BASE}/`, {
             headers: { 'Authorization': `OAuth ${token}` }
         });
         if (!response.ok) {
             throw new Error('Неверный токен или истек срок действия.');
         }
-        // Токен рабочий
         authSection.style.display = 'none';
         content.style.display = 'block';
         await loadAlbums();
@@ -243,7 +219,6 @@ authBtn.addEventListener('click', async () => {
     }
 });
 
-// Также можно разрешить загрузку по Enter в поле ввода
 tokenInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
         authBtn.click();
