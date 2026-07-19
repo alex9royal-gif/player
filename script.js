@@ -105,9 +105,9 @@ async function loadCover(albumPath, imgElement) {
         const imageFiles = items.filter(item => 
             item.type === 'file' && imageExtensions.some(ext => item.name.toLowerCase().endsWith(ext))
         );
-        if (imageFiles.length === 0) return; // нет изображений – оставляем placeholder
+        if (imageFiles.length === 0) return; // нет изображений
 
-        // Сортируем: сначала файлы с "cover" или "folder" в имени (для приоритета)
+        // Сортируем: сначала файлы с "cover" или "folder" в имени (приоритет)
         imageFiles.sort((a, b) => {
             const aName = a.name.toLowerCase();
             const bName = b.name.toLowerCase();
@@ -116,27 +116,20 @@ async function loadCover(albumPath, imgElement) {
             return aPriority - bPriority;
         });
 
-        // Берём первое подходящее изображение
         const firstImage = imageFiles[0];
-        // Запрашиваем полные метаданные файла (чтобы получить sizes)
+        // Получаем полные метаданные файла (чтобы получить sizes)
         const resourceData = await apiRequest(`/resources?path=${encodeURIComponent(firstImage.path)}`);
         
         let imageUrl = null;
         if (resourceData.sizes && resourceData.sizes.length > 0) {
-            // Ищем размер "L" (оптимальный для отображения на экране)
+            // Ищем размер "L" (оптимальный для отображения)
             const sizeL = resourceData.sizes.find(s => s.name === 'L');
-            if (sizeL) {
-                imageUrl = sizeL.url;
-            } else {
-                // Если "L" нет, берём первый доступный размер (например, "M" или "ORIGINAL")
-                imageUrl = resourceData.sizes[0].url;
-            }
+            imageUrl = sizeL ? sizeL.url : resourceData.sizes[0].url;
         }
-        // Если sizes нет (редкий случай), используем прямую ссылку на файл или превью
-        if (!imageUrl) {
-            imageUrl = resourceData.file || resourceData.preview || null;
+        // Резерв: если sizes нет (редко), используем preview (он тоже работает для показа)
+        if (!imageUrl && resourceData.preview) {
+            imageUrl = resourceData.preview;
         }
-        
         if (imageUrl) {
             imgElement.src = imageUrl;
         }
