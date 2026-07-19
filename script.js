@@ -96,30 +96,50 @@ function renderAlbums() {
     });
 }
 
-// --- Загрузка обложки альбома (любое изображение в папке) ---
+// --- Загрузка обложки альбома (используем sizes с name="L") ---
 async function loadCover(albumPath, imgElement) {
     try {
-        // Получаем все файлы в папке альбома
+        // Получаем список всех файлов в папке альбома
         const items = await getFolderContents(albumPath);
-        // Расширения, которые считаем изображениями
         const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
         const imageFiles = items.filter(item => 
             item.type === 'file' && imageExtensions.some(ext => item.name.toLowerCase().endsWith(ext))
         );
-        if (imageFiles.length > 0) {
-            // Сортируем: сначала файлы с "cover" или "folder" в имени (для приоритета)
-            imageFiles.sort((a, b) => {
-                const aName = a.name.toLowerCase();
-                const bName = b.name.toLowerCase();
-                const aPriority = (aName.includes('cover') || aName.includes('folder')) ? 0 : 1;
-                const bPriority = (bName.includes('cover') || bName.includes('folder')) ? 0 : 1;
-                return aPriority - bPriority;
-            });
-            // Берём первое подходящее изображение
-            const link = await getDownloadLink(imageFiles[0].path);
-            imgElement.src = link;
+        if (imageFiles.length === 0) return; // нет изображений – оставляем placeholder
+
+        // Сортируем: сначала файлы с "cover" или "folder" в имени (для приоритета)
+        imageFiles.sort((a, b) => {
+            const aName = a.name.toLowerCase();
+            const bName = b.name.toLowerCase();
+            const aPriority = (aName.includes('cover') || aName.includes('folder')) ? 0 : 1;
+            const bPriority = (bName.includes('cover') || bName.includes('folder')) ? 0 : 1;
+            return aPriority - bPriority;
+        });
+
+        // Берём первое подходящее изображение
+        const firstImage = imageFiles[0];
+        // Запрашиваем полные метаданные файла (чтобы получить sizes)
+        const resourceData = await apiRequest(`/resources?path=${encodeURIComponent(firstImage.path)}`);
+        
+        let imageUrl = null;
+        if (resourceData.sizes && resourceData.sizes.length > 0) {
+            // Ищем размер "L" (оптимальный для отображения на экране)
+            const sizeL = resourceData.sizes.find(s => s.name === 'L');
+            if (sizeL) {
+                imageUrl = sizeL.url;
+            } else {
+                // Если "L" нет, берём первый доступный размер (например, "M" или "ORIGINAL")
+                imageUrl = resourceData.sizes[0].url;
+            }
         }
-        // Если изображений нет – оставляем placeholder
+        // Если sizes нет (редкий случай), используем прямую ссылку на файл или превью
+        if (!imageUrl) {
+            imageUrl = resourceData.file || resourceData.preview || null;
+        }
+        
+        if (imageUrl) {
+            imgElement.src = imageUrl;
+        }
     } catch (error) {
         console.warn('Не удалось загрузить обложку для', albumPath, error);
     }
