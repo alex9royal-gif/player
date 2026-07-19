@@ -162,7 +162,6 @@ async function showPlayer() {
     }
     
     // --- Убрано автоматическое воспроизведение первого трека ---
-    // Теперь пользователь сам выбирает трек для прослушивания
 }
 
 async function playTrack(liElement) {
@@ -180,6 +179,18 @@ async function playTrack(liElement) {
     }
 }
 
+// --- Автопереключение на следующий трек по окончании ---
+audioPlayer.addEventListener('ended', function() {
+    const activeLi = trackList.querySelector('li.active');
+    if (activeLi) {
+        const nextLi = activeLi.nextElementSibling;
+        if (nextLi) {
+            playTrack(nextLi);
+        }
+        // если следующего нет, просто останавливаемся
+    }
+});
+
 // --- Навигация ---
 
 backBtn.addEventListener('click', () => {
@@ -187,6 +198,8 @@ backBtn.addEventListener('click', () => {
     albumGrid.style.display = 'grid';
     audioPlayer.pause();
     audioPlayer.src = '';
+    // сбрасываем активный класс, чтобы при повторном открытии не было подсветки
+    trackList.querySelectorAll('li').forEach(li => li.classList.remove('active'));
 });
 
 // --- Авторизация ---
