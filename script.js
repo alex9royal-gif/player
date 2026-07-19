@@ -1,5 +1,5 @@
 // --- Конфигурация ---
-const YANDEX_API_BASE = 'https://cloud-api.yandex.net/v1/disk';
+const YANDEX_API_BASE = 'webdav.yandex.ru';
 const MUSIC_FOLDER = '/music'; // Папка на Яндекс.Диске, где лежат альбомы
 
 // --- Состояние приложения ---
