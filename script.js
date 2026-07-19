@@ -27,7 +27,7 @@ const backBtn = document.getElementById('back-btn');
 async function apiRequest(endpoint, method = 'GET', body = null) {
     const url = `${YANDEX_API_BASE}${endpoint}`;
     const headers = {
-        'Authorization': `OAuth ${token}`,
+        'Authorization': `${token}`,
         'Accept': 'application/json'
     };
     if (body) {
