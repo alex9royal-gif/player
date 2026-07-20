@@ -30,7 +30,7 @@ const backBtn = document.getElementById('back-btn');
 const videoGrid = document.getElementById('video-grid');
 const videoPlayerContainer = document.getElementById('video-player-container');
 const videoPlayer = document.getElementById('video-player');
-const videoBackBtn = document.getElementById('video-back-btn');
+const videoTitle = document.getElementById('video-title');
 
 // Вкладки
 const tabBtns = document.querySelectorAll('.tab-btn');
@@ -39,9 +39,13 @@ const tabPanes = {
     video: document.getElementById('video-tab')
 };
 
-// --- Установка громкости по умолчанию 50% ---
+// --- Установка громкости по умолчанию ---
 audioPlayer.volume = 0.5;
-videoPlayer.volume = 0.5; // добавлено для видео
+videoPlayer.volume = 0.3;
+
+// --- Расширения файлов ---
+const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
+const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv'];
 
 // --- Вспомогательные функции API ---
 
@@ -54,13 +58,8 @@ async function apiRequest(endpoint, method = 'GET', body = null) {
     if (body) {
         headers['Content-Type'] = 'application/json';
     }
-    const options = {
-        method,
-        headers,
-    };
-    if (body) {
-        options.body = JSON.stringify(body);
-    }
+    const options = { method, headers };
+    if (body) options.body = JSON.stringify(body);
     const response = await fetch(url, options);
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -107,21 +106,17 @@ function renderAlbums() {
         `;
         card.addEventListener('click', () => openAlbum(album));
         albumGrid.appendChild(card);
-        
         loadCover(album.path, card.querySelector('img'));
     });
 }
 
-// --- Загрузка обложки через /resources/download ---
 async function loadCover(albumPath, imgElement) {
     try {
         const items = await getFolderContents(albumPath);
-        const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
         const imageFiles = items.filter(item => 
             item.type === 'file' && imageExtensions.some(ext => item.name.toLowerCase().endsWith(ext))
         );
         if (imageFiles.length === 0) return;
-
         imageFiles.sort((a, b) => {
             const aName = a.name.toLowerCase();
             const bName = b.name.toLowerCase();
@@ -129,7 +124,6 @@ async function loadCover(albumPath, imgElement) {
             const bPriority = (bName.includes('cover') || bName.includes('folder')) ? 0 : 1;
             return aPriority - bPriority;
         });
-
         const firstImage = imageFiles[0];
         const downloadUrl = await getDownloadLink(firstImage.path);
         imgElement.src = downloadUrl;
@@ -147,12 +141,7 @@ async function openAlbum(album) {
             item.type === 'file' && /\.(mp3|wav|ogg|flac|m4a)$/i.test(item.name)
         );
         trackFiles.sort((a, b) => a.name.localeCompare(b.name));
-        
-        currentAlbum = {
-            ...album,
-            tracks: trackFiles
-        };
-        
+        currentAlbum = { ...album, tracks: trackFiles };
         showPlayer();
     } catch (error) {
         console.error('Ошибка загрузки треков:', error);
@@ -163,20 +152,15 @@ async function openAlbum(album) {
 async function showPlayer() {
     albumGrid.style.display = 'none';
     player.style.display = 'block';
-    
     albumTitle.textContent = currentAlbum.name;
     albumCover.src = 'placeholder.jpg';
-    
     loadCover(currentAlbum.path, albumCover);
-    
     trackList.innerHTML = '';
     for (const track of currentAlbum.tracks) {
         const li = document.createElement('li');
         li.textContent = track.name.replace(/\.[^.]+$/, '');
         li.dataset.trackPath = track.path;
-        li.addEventListener('click', async () => {
-            await playTrack(li);
-        });
+        li.addEventListener('click', async () => await playTrack(li));
         trackList.appendChild(li);
     }
 }
@@ -196,18 +180,13 @@ async function playTrack(liElement) {
     }
 }
 
-// --- Автопереключение на следующий трек по окончании ---
 audioPlayer.addEventListener('ended', function() {
     const activeLi = trackList.querySelector('li.active');
-    if (activeLi) {
-        const nextLi = activeLi.nextElementSibling;
-        if (nextLi) {
-            playTrack(nextLi);
-        }
+    if (activeLi && activeLi.nextElementSibling) {
+        playTrack(activeLi.nextElementSibling);
     }
 });
 
-// --- Навигация аудио ---
 backBtn.addEventListener('click', () => {
     player.style.display = 'none';
     albumGrid.style.display = 'grid';
@@ -216,15 +195,31 @@ backBtn.addEventListener('click', () => {
     trackList.querySelectorAll('li').forEach(li => li.classList.remove('active'));
 });
 
-// --- ЗАГРУЗКА ВИДЕО ---
+// --- ЗАГРУЗКА ВИДЕО С ПРЕВЬЮ ---
 
 async function loadVideos() {
     try {
         const items = await getFolderContents(VIDEO_FOLDER);
-        const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv'];
-        videoFiles = items.filter(item => 
+        // Разделяем на видео и изображения
+        const videoItems = items.filter(item => 
             item.type === 'file' && videoExtensions.some(ext => item.name.toLowerCase().endsWith(ext))
         );
+        const imageItems = items.filter(item => 
+            item.type === 'file' && imageExtensions.some(ext => item.name.toLowerCase().endsWith(ext))
+        );
+
+        // Для каждого видео ищем соответствующее изображение
+        videoFiles = videoItems.map(video => {
+            const baseName = video.name.replace(/\.[^.]+$/, ''); // имя без расширения
+            // Ищем изображение с таким же базовым именем (регистронезависимо)
+            const thumbnail = imageItems.find(img => 
+                img.name.replace(/\.[^.]+$/, '').toLowerCase() === baseName.toLowerCase()
+            );
+            return {
+                ...video,
+                thumbnailItem: thumbnail || null
+            };
+        });
         videoFiles.sort((a, b) => a.name.localeCompare(b.name));
         renderVideos();
     } catch (error) {
@@ -242,15 +237,58 @@ function renderVideos() {
     videoFiles.forEach(file => {
         const card = document.createElement('div');
         card.className = 'video-card';
-        card.innerHTML = `
-            <div class="video-thumbnail">
-                <span>▶</span>
-            </div>
-            <p>${file.name}</p>
-        `;
-        card.addEventListener('click', () => playVideo(file));
+
+        const thumbDiv = document.createElement('div');
+        thumbDiv.className = 'video-thumbnail';
+
+        if (file.thumbnailItem) {
+            const img = document.createElement('img');
+            img.alt = file.name;
+            img.style.width = '100%';
+            img.style.height = '100%';
+            img.style.objectFit = 'cover';
+            thumbDiv.appendChild(img);
+            // Загружаем картинку-превью
+            loadVideoThumbnail(file, img);
+        } else {
+            thumbDiv.innerHTML = '<span>▶</span>';
+        }
+
+        card.appendChild(thumbDiv);
+        const p = document.createElement('p');
+        p.textContent = file.name;
+        card.appendChild(p);
+
+        card.addEventListener('click', () => toggleVideo(file, card));
         videoGrid.appendChild(card);
     });
+}
+
+async function loadVideoThumbnail(file, imgElement) {
+    if (!file.thumbnailItem) return;
+    try {
+        const downloadUrl = await getDownloadLink(file.thumbnailItem.path);
+        imgElement.src = downloadUrl;
+    } catch (error) {
+        console.warn('Не удалось загрузить превью для', file.name, error);
+    }
+}
+
+// --- Переключение видео (показ/скрытие плеера) ---
+
+function toggleVideo(file, card) {
+    // Если плеер уже показывает это видео, скрываем его
+    if (currentVideo && currentVideo.path === file.path && videoPlayerContainer.style.display !== 'none') {
+        videoPlayer.pause();
+        videoPlayer.src = '';
+        videoPlayerContainer.style.display = 'none';
+        videoTitle.textContent = '';
+        currentVideo = null;
+        document.querySelectorAll('.video-card').forEach(c => c.classList.remove('active'));
+        return;
+    }
+    // Иначе показываем/переключаем видео
+    playVideo(file);
 }
 
 async function playVideo(file) {
@@ -259,8 +297,17 @@ async function playVideo(file) {
         videoPlayer.src = downloadUrl;
         videoPlayer.load();
         videoPlayer.play();
-        videoGrid.style.display = 'none';
         videoPlayerContainer.style.display = 'block';
+        videoTitle.textContent = file.name;
+        document.querySelectorAll('.video-card').forEach(c => c.classList.remove('active'));
+        // Находим карточку с этим файлом и подсвечиваем
+        const cards = document.querySelectorAll('.video-card');
+        for (let card of cards) {
+            if (card.querySelector('p').textContent === file.name) {
+                card.classList.add('active');
+                break;
+            }
+        }
         currentVideo = file;
     } catch (error) {
         console.error('Ошибка воспроизведения видео:', error);
@@ -268,40 +315,28 @@ async function playVideo(file) {
     }
 }
 
-videoBackBtn.addEventListener('click', () => {
-    videoPlayer.pause();
-    videoPlayer.src = '';
-    videoPlayerContainer.style.display = 'none';
-    videoGrid.style.display = 'grid';
-    currentVideo = null;
-});
-
 // --- ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК ---
 
 tabBtns.forEach(btn => {
     btn.addEventListener('click', () => {
-        // Убираем активный класс у всех кнопок и панелей
         tabBtns.forEach(b => b.classList.remove('active'));
         Object.values(tabPanes).forEach(pane => pane.classList.remove('active'));
 
-        // Активируем текущую
         btn.classList.add('active');
         const tab = btn.dataset.tab;
         tabPanes[tab].classList.add('active');
 
-        // Загружаем видео при первом открытии вкладки
         if (tab === 'video' && videoFiles.length === 0) {
             loadVideos();
         }
 
-        // Останавливаем проигрывание в другой вкладке
         if (tab === 'audio') {
             videoPlayer.pause();
             videoPlayer.src = '';
-            if (videoPlayerContainer.style.display !== 'none') {
-                videoPlayerContainer.style.display = 'none';
-                videoGrid.style.display = 'grid';
-            }
+            videoPlayerContainer.style.display = 'none';
+            videoTitle.textContent = '';
+            currentVideo = null;
+            document.querySelectorAll('.video-card').forEach(c => c.classList.remove('active'));
         } else if (tab === 'video') {
             audioPlayer.pause();
             trackList.querySelectorAll('li').forEach(li => li.classList.remove('active'));
@@ -335,7 +370,5 @@ authBtn.addEventListener('click', async () => {
 });
 
 tokenInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-        authBtn.click();
-    }
+    if (e.key === 'Enter') authBtn.click();
 });
