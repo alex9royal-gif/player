@@ -19,14 +19,33 @@
 
         <!-- Основной контент -->
         <div id="content" style="display: none;">
-            <div id="album-grid"></div>
-            
-            <div id="player" style="display: none;">
-                <h2 id="album-title"></h2>
-                <img id="album-cover" src="placeholder.jpg" alt="Обложка" style="width:500px;height:500px;object-fit:cover;border-radius:10px;margin:15px auto;display:block;">
-                <audio id="audio-player" controls></audio>
-                <ul id="track-list"></ul>
-                <button id="back-btn">← Назад к альбомам</button>
+            <!-- Вкладки -->
+            <div id="tabs">
+                <button class="tab-btn active" data-tab="audio">АУДИО</button>
+                <button class="tab-btn" data-tab="video">ВИДЕО</button>
+            </div>
+            <div id="tab-content">
+                <!-- Аудио вкладка -->
+                <div id="audio-tab" class="tab-pane active">
+                    <div id="album-grid"></div>
+                    <div id="player" style="display: none;">
+                        <h2 id="album-title"></h2>
+                        <img id="album-cover" src="placeholder.jpg" alt="Обложка" style="width:500px;height:500px;object-fit:cover;border-radius:10px;margin:15px auto;display:block;">
+                        <audio id="audio-player" controls></audio>
+                        <ul id="track-list"></ul>
+                        <button id="back-btn">← Назад к альбомам</button>
+                    </div>
+                </div>
+                <!-- Видео вкладка -->
+                <div id="video-tab" class="tab-pane">
+                    <!-- Плеер видео (по умолчанию скрыт) -->
+                    <div id="video-player-container" style="display: none;">
+                        <div id="video-title"></div>
+                        <video id="video-player" controls></video>
+                    </div>
+                    <!-- Грид видео (всегда виден) -->
+                    <div id="video-grid"></div>
+                </div>
             </div>
         </div>
     </div>
