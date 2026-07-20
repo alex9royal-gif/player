@@ -55,6 +55,37 @@ h1 {
     background: #c73652;
 }
 
+/* Вкладки */
+#tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    justify-content: center;
+}
+.tab-btn {
+    background: #16213e;
+    color: #fff;
+    border: none;
+    padding: 10px 30px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 18px;
+    transition: background 0.3s;
+}
+.tab-btn.active {
+    background: #e94560;
+}
+.tab-btn:hover {
+    background: #c73652;
+}
+.tab-pane {
+    display: none;
+}
+.tab-pane.active {
+    display: block;
+}
+
+/* Аудио альбомы */
 #album-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -87,6 +118,7 @@ h1 {
     margin-bottom: 5px;
 }
 
+/* Плеер аудио */
 #player {
     background: #16213e;
     padding: 30px;
@@ -140,4 +172,62 @@ h1 {
 audio {
     width: 100%;
     margin: 15px 0;
+}
+
+/* Видео грид */
+#video-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+}
+.video-card {
+    background: #16213e;
+    border-radius: 10px;
+    padding: 15px;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.3s;
+}
+.video-card:hover {
+    transform: scale(1.05);
+}
+.video-thumbnail {
+    width: 100%;
+    aspect-ratio: 16/9;
+    background: #0f0f1f;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    font-size: 48px;
+    color: #e94560;
+}
+.video-card p {
+    font-size: 14px;
+    margin: 5px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Плеер видео */
+#video-player-container {
+    background: #16213e;
+    padding: 20px;
+    border-radius: 15px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+#video-back-btn {
+    background: #e94560;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 10px;
+}
+#video-back-btn:hover {
+    background: #c73652;
 }
