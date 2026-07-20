@@ -41,6 +41,7 @@ const tabPanes = {
 
 // --- Установка громкости по умолчанию 50% ---
 audioPlayer.volume = 0.5;
+videoPlayer.volume = 0.5; // добавлено для видео
 
 // --- Вспомогательные функции API ---
 
@@ -303,7 +304,6 @@ tabBtns.forEach(btn => {
             }
         } else if (tab === 'video') {
             audioPlayer.pause();
-            // Сброс активного трека, если нужно
             trackList.querySelectorAll('li').forEach(li => li.classList.remove('active'));
         }
     });
@@ -327,7 +327,6 @@ authBtn.addEventListener('click', async () => {
         }
         authSection.style.display = 'none';
         content.style.display = 'block';
-        // Загружаем аудио (по умолчанию открыта вкладка аудио)
         await loadAlbums();
     } catch (error) {
         authError.textContent = `Ошибка авторизации: ${error.message}`;
