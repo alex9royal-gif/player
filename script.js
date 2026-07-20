@@ -40,7 +40,7 @@ const tabPanes = {
 };
 
 // --- Установка громкости по умолчанию ---
-audioPlayer.volume = 0.5;
+audioPlayer.volume = 0.3;
 videoPlayer.volume = 0.3;
 
 // --- Расширения файлов ---
