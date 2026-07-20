@@ -1,11 +1,14 @@
 // --- Конфигурация ---
 const YANDEX_API_BASE = 'https://cloud-api.yandex.net/v1/disk';
 const MUSIC_FOLDER = '/music';
+const VIDEO_FOLDER = '/video';
 
 // --- Состояние приложения ---
 let albums = [];
 let currentAlbum = null;
 let token = '';
+let videoFiles = [];
+let currentVideo = null;
 
 // --- DOM элементы ---
 const authSection = document.getElementById('auth-section');
@@ -13,6 +16,8 @@ const tokenInput = document.getElementById('token-input');
 const authBtn = document.getElementById('auth-btn');
 const authError = document.getElementById('auth-error');
 const content = document.getElementById('content');
+
+// Аудио
 const albumGrid = document.getElementById('album-grid');
 const player = document.getElementById('player');
 const albumTitle = document.getElementById('album-title');
@@ -20,6 +25,19 @@ const albumCover = document.getElementById('album-cover');
 const trackList = document.getElementById('track-list');
 const audioPlayer = document.getElementById('audio-player');
 const backBtn = document.getElementById('back-btn');
+
+// Видео
+const videoGrid = document.getElementById('video-grid');
+const videoPlayerContainer = document.getElementById('video-player-container');
+const videoPlayer = document.getElementById('video-player');
+const videoBackBtn = document.getElementById('video-back-btn');
+
+// Вкладки
+const tabBtns = document.querySelectorAll('.tab-btn');
+const tabPanes = {
+    audio: document.getElementById('audio-tab'),
+    video: document.getElementById('video-tab')
+};
 
 // --- Установка громкости по умолчанию 50% ---
 audioPlayer.volume = 0.5;
@@ -29,7 +47,7 @@ audioPlayer.volume = 0.5;
 async function apiRequest(endpoint, method = 'GET', body = null) {
     const url = `${YANDEX_API_BASE}${endpoint}`;
     const headers = {
-        'Authorization': `${token}`,
+        'Authorization': `OAuth ${token}`,
         'Accept': 'application/json'
     };
     if (body) {
@@ -60,7 +78,7 @@ async function getDownloadLink(path) {
     return data.href;
 }
 
-// --- Загрузка альбомов ---
+// --- Загрузка аудио альбомов ---
 
 async function loadAlbums() {
     try {
@@ -119,7 +137,7 @@ async function loadCover(albumPath, imgElement) {
     }
 }
 
-// --- Открытие альбома ---
+// --- Открытие аудио альбома ---
 
 async function openAlbum(album) {
     try {
@@ -160,8 +178,6 @@ async function showPlayer() {
         });
         trackList.appendChild(li);
     }
-    
-    // --- Убрано автоматическое воспроизведение первого трека ---
 }
 
 async function playTrack(liElement) {
@@ -187,22 +203,113 @@ audioPlayer.addEventListener('ended', function() {
         if (nextLi) {
             playTrack(nextLi);
         }
-        // если следующего нет, просто останавливаемся
     }
 });
 
-// --- Навигация ---
-
+// --- Навигация аудио ---
 backBtn.addEventListener('click', () => {
     player.style.display = 'none';
     albumGrid.style.display = 'grid';
     audioPlayer.pause();
     audioPlayer.src = '';
-    // сбрасываем активный класс, чтобы при повторном открытии не было подсветки
     trackList.querySelectorAll('li').forEach(li => li.classList.remove('active'));
 });
 
-// --- Авторизация ---
+// --- ЗАГРУЗКА ВИДЕО ---
+
+async function loadVideos() {
+    try {
+        const items = await getFolderContents(VIDEO_FOLDER);
+        const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv'];
+        videoFiles = items.filter(item => 
+            item.type === 'file' && videoExtensions.some(ext => item.name.toLowerCase().endsWith(ext))
+        );
+        videoFiles.sort((a, b) => a.name.localeCompare(b.name));
+        renderVideos();
+    } catch (error) {
+        console.error('Ошибка загрузки видео:', error);
+        videoGrid.innerHTML = `<p style="color:red;">Не удалось загрузить видео: ${error.message}</p>`;
+    }
+}
+
+function renderVideos() {
+    videoGrid.innerHTML = '';
+    if (videoFiles.length === 0) {
+        videoGrid.innerHTML = '<p>В папке "video" нет видеофайлов.</p>';
+        return;
+    }
+    videoFiles.forEach(file => {
+        const card = document.createElement('div');
+        card.className = 'video-card';
+        card.innerHTML = `
+            <div class="video-thumbnail">
+                <span>▶</span>
+            </div>
+            <p>${file.name}</p>
+        `;
+        card.addEventListener('click', () => playVideo(file));
+        videoGrid.appendChild(card);
+    });
+}
+
+async function playVideo(file) {
+    try {
+        const downloadUrl = await getDownloadLink(file.path);
+        videoPlayer.src = downloadUrl;
+        videoPlayer.load();
+        videoPlayer.play();
+        videoGrid.style.display = 'none';
+        videoPlayerContainer.style.display = 'block';
+        currentVideo = file;
+    } catch (error) {
+        console.error('Ошибка воспроизведения видео:', error);
+        alert(`Не удалось получить ссылку на видео: ${error.message}`);
+    }
+}
+
+videoBackBtn.addEventListener('click', () => {
+    videoPlayer.pause();
+    videoPlayer.src = '';
+    videoPlayerContainer.style.display = 'none';
+    videoGrid.style.display = 'grid';
+    currentVideo = null;
+});
+
+// --- ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК ---
+
+tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        // Убираем активный класс у всех кнопок и панелей
+        tabBtns.forEach(b => b.classList.remove('active'));
+        Object.values(tabPanes).forEach(pane => pane.classList.remove('active'));
+
+        // Активируем текущую
+        btn.classList.add('active');
+        const tab = btn.dataset.tab;
+        tabPanes[tab].classList.add('active');
+
+        // Загружаем видео при первом открытии вкладки
+        if (tab === 'video' && videoFiles.length === 0) {
+            loadVideos();
+        }
+
+        // Останавливаем проигрывание в другой вкладке
+        if (tab === 'audio') {
+            videoPlayer.pause();
+            videoPlayer.src = '';
+            if (videoPlayerContainer.style.display !== 'none') {
+                videoPlayerContainer.style.display = 'none';
+                videoGrid.style.display = 'grid';
+            }
+        } else if (tab === 'video') {
+            audioPlayer.pause();
+            // Сброс активного трека, если нужно
+            trackList.querySelectorAll('li').forEach(li => li.classList.remove('active'));
+        }
+    });
+});
+
+// --- АВТОРИЗАЦИЯ ---
 
 authBtn.addEventListener('click', async () => {
     token = tokenInput.value.trim();
@@ -220,6 +327,7 @@ authBtn.addEventListener('click', async () => {
         }
         authSection.style.display = 'none';
         content.style.display = 'block';
+        // Загружаем аудио (по умолчанию открыта вкладка аудио)
         await loadAlbums();
     } catch (error) {
         authError.textContent = `Ошибка авторизации: ${error.message}`;
